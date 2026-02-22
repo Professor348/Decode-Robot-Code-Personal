@@ -8,9 +8,12 @@ import com.qualcomm.robotcore.hardware.DcMotorSimple;
 import com.qualcomm.robotcore.hardware.Servo;
 import com.skeletonarmy.marrow.zones.PolygonZone;
 
+import org.firstinspires.ftc.teamcode.LOADCode.Main_.Hardware_.AprilTagVisionSystem;
 import org.firstinspires.ftc.teamcode.LOADCode.Main_.Hardware_.LoadHardwareClass;
 import org.firstinspires.ftc.teamcode.LOADCode.Main_.Utils_;
 
+import dev.nextftc.control.ControlSystem;
+import dev.nextftc.control.KineticState;
 import dev.nextftc.control.feedback.PIDCoefficients;
 import dev.nextftc.control.feedforward.BasicFeedforwardParameters;
 
@@ -18,6 +21,7 @@ import dev.nextftc.control.feedforward.BasicFeedforwardParameters;
 public class Turret {
 
     // Hardware definitions
+    public final AprilTagVisionSystem vision = new AprilTagVisionSystem();
     public final Devices.DcMotorExClass rotation = new Devices.DcMotorExClass();
     public final Devices.DcMotorExClass flywheel = new Devices.DcMotorExClass();
     private final Devices.DcMotorExClass flywheel2 = new Devices.DcMotorExClass();
@@ -26,19 +30,20 @@ public class Turret {
     public final Devices.REVHallEffectSensorClass hall = new Devices.REVHallEffectSensorClass();
 
     // Turret PID coefficients
-    public static PIDCoefficients turretCoefficients = new PIDCoefficients(0.02, 0.00000000005, 0.004); // 223RPM Motor
+    public static PIDCoefficients turretCoefficients = new PIDCoefficients(0.022, 0.0000000002, 0.0015); // 223RPM Motor
+    public static PIDCoefficients cameraCoefficients = new PIDCoefficients(0, 0, 0);
 
     // Flywheel PID coefficients for various speeds
     //public static PIDCoefficients flywheelCoefficients = new PIDCoefficients(0.0002, 0, 0); // 4500 RPM
     public static PIDCoefficients flywheelCoefficients4200 = new PIDCoefficients(0.0004, 0, 0); // 4200 RPM
     public static PIDCoefficients flywheelCoefficients3500 = new PIDCoefficients(0.00025, 0, 0); // 3500 RPM
-    //public static PIDCoefficients flywheelCoefficients = new PIDCoefficients(0.00025, 0, 0); // 3000 RPM
+    public static PIDCoefficients flywheelCoefficients3000 = new PIDCoefficients(0.00025, 0, 0); // 3000 RPM
 
     // Flywheel FF coefficients for various speeds
     //public static BasicFeedforwardParameters flywheelFFCoefficients = new BasicFeedforwardParameters(0.000026,0,0); // 4500 RPM
-    public static BasicFeedforwardParameters flywheelFFCoefficients4200 = new BasicFeedforwardParameters(0.000032,0,0); // 4200 RPM
-    public static BasicFeedforwardParameters flywheelFFCoefficients3500 = new BasicFeedforwardParameters(0.000032,0,0); // 3500 RPM
-    //public static BasicFeedforwardParameters flywheelFFCoefficients = new BasicFeedforwardParameters(0.000031,0,0); // 3000 RPM
+    public static BasicFeedforwardParameters flywheelFFCoefficients4200 = new BasicFeedforwardParameters(0.0000328,0,0); // 4200 RPM
+    public static BasicFeedforwardParameters flywheelFFCoefficients3500 = new BasicFeedforwardParameters(0.0000323,0,0); // 3500 RPM
+    public static BasicFeedforwardParameters flywheelFFCoefficients3000 = new BasicFeedforwardParameters(0.000031,0,0); // 3000 RPM
 
     // Actual Flywheel Coefficients
     private PIDCoefficients actualFlywheelCoefficients = flywheelCoefficients3500;
@@ -59,7 +64,9 @@ public class Turret {
     public flywheelState flywheelMode = flywheelState.OFF;
     double targetRPM = 0;
     /** Controls the target speed of the flywheel when it is on.*/
-    public static double flywheelNearSpeed = 3500;
+    public static double flywheelReallyNearSpeed = 2800;
+    public static double flywheelNearSpeed = 3300;
+    public static double flywheelFarNearSpeed = 3600;
     public static double flywheelFarSpeed = 4200;
     /** Controls the upper software limit of the hood.*/
     public static double upperHoodLimit = 260;
@@ -71,6 +78,12 @@ public class Turret {
      * Stores the zeroing state of the turret
      */
     public static boolean zeroed = false;
+    /**
+     * Controls which aiming system to use.
+     */
+    public boolean useCameraAim = false;
+    public static boolean aprilTagToggle = false;
+    public double cameraTurretError = 0;
 
     // Stores important objects for later access
     OpMode opMode = null;
@@ -78,12 +91,22 @@ public class Turret {
     PolygonZone robotZone = new PolygonZone(15, 15);
 
     // The variable to store the InterpLUT table for turret hood aimbot
-    public Utils_.InterpLUT hoodLUT = new Utils_.InterpLUT();
+    public Utils_.InterpLUT hoodLUTnear = new Utils_.InterpLUT();
+    public Utils_.InterpLUT hoodLUTfar = new Utils_.InterpLUT();
+
+    public void initVision(OpMode opmode){
+        // Initialize AprilTag vision system
+        vision.init(opmode);
+    }
 
     public void init(OpMode opmode, LoadHardwareClass robot){
         // Store important objects in their respective variables
         opMode = opmode;
         Robot = robot;
+
+        if (!vision.initialized){
+            vision.init(opmode);
+        }
 
         // Initialize hardware objects
         rotation.init(opmode, "turret", 751.8 * ((double) 131 / 36));
@@ -117,20 +140,37 @@ public class Turret {
         flywheel2.setPidCoefficients(actualFlywheelCoefficients);
         flywheel2.setFFCoefficients(actualFlywheelFFCoefficients);
 
-        // TODO Build hood InterpLUT for autoaim
+        // Safety points for LUTs
+        hoodLUTnear.add(0, 0);
+        hoodLUTfar.add(0, 190);
+
+        // --------------------------------------------------------
+
         // Near zone measurements
-        hoodLUT.add(0, 0);
-        hoodLUT.add(53.5,108);
-        hoodLUT.add(71,168);
-        hoodLUT.add(77, 181);
-        hoodLUT.add(88,190);
-        hoodLUT.add(94.5,190);
+        hoodLUTnear.add(60, 0);
+        hoodLUTnear.add(68.5, 140.5);
+        hoodLUTnear.add(71, 182);
+        hoodLUTnear.add(84.5, 175);
+        hoodLUTnear.add(88, 145);
+        hoodLUTnear.add(90, 145);
+        hoodLUTnear.add(97.5, 200);
+        hoodLUTnear.add(102, 187);
+        hoodLUTnear.add(114, 165);
+
         // Far zone measurements
-        hoodLUT.add(103, 200);
-        hoodLUT.add(204, 200);
+        hoodLUTfar.add(139.5, 190);
+        hoodLUTfar.add(150, 190);
+        hoodLUTfar.add(160, 160);
+
+        // --------------------------------------------------------
+
+        // Safety points for LUTs
+        hoodLUTnear.add(300, 165);
+        hoodLUTfar.add(300, 160);
 
         // Generate Lookup Table & Initialize servo position
-        hoodLUT.createLUT();
+        hoodLUTnear.createLUT();
+        hoodLUTfar.createLUT();
         setHood(0);
     }
 
@@ -145,10 +185,6 @@ public class Turret {
         rotation.setOffsetDegrees(turretOffset);
     }
 
-    double redOffset = -2;
-    double blueOffset = 2;
-    double posOffset = 4;
-
     /**
      * Runs the aimbot program to control the turret rotation and hood angle. </br>
      * Must be called every loop to function properly.
@@ -156,50 +192,106 @@ public class Turret {
      *               Otherwise, sets the turret to face forwards.
      * @param hood If TRUE, enables the hood autoaim.
      *             Otherwise, sets the hood to the highest launch angle.
+     * @param hoodOffset a offset to apply to the hood angle in degrees of servo rotation.
      */
     public void updateAimbot(boolean turret, boolean hood, double hoodOffset){
-        updatePIDs();
-        if (turret){
-            // Set the turret rotation
-            if (LoadHardwareClass.selectedAlliance == LoadHardwareClass.Alliance.RED){
-                rotation.setAngle(Math.min(Math.max(0, calcLocalizer()+redOffset), 360));
-            }else{
-                rotation.setAngle(Math.min(Math.max(0, calcLocalizer()+blueOffset), 360));
-            }
-        }else{
-            rotation.setAngle(90);
-        }
-        if (hood){
-            updateHoodAimbot(hoodOffset);
-        }else{
-            setHood(0);
-        }
-    }
-    // FIXME does not work currently
-    public void updateAimbotWithVelocity(boolean turret, boolean hood, double hoodOffset){
-        updatePIDs();
-        if (turret){
-            // Set the turret rotation
-            if (LoadHardwareClass.selectedAlliance == LoadHardwareClass.Alliance.RED){
-                rotation.setAngle(Math.max(0, calcLocalizer()+redOffset)%360, -Math.toDegrees(Robot.drivetrain.follower.getAngularVelocity()));
-            }else{
-                rotation.setAngle(Math.max(0, calcLocalizer()+blueOffset)%360, -Math.toDegrees(Robot.drivetrain.follower.getAngularVelocity()));
-            }
-        }else{
-            rotation.setAngle(90);
-        }
-        if (hood){
-            updateHoodAimbot(hoodOffset);
-        }else{
-            setHood(0);
-        }
-    }
 
-    private void updateHoodAimbot(double hoodOffset){
+        robotZone.setPosition(Robot.drivetrain.follower.getPose().getX(), Robot.drivetrain.follower.getPose().getY());
+        robotZone.setRotation(Robot.drivetrain.follower.getPose().getHeading());
+
+        if (turret){
+            updateRotationalAimbot();
+        }else{
+            rotation.setAngle(90);
+        }
+        if (hood){
+            updateHoodAimbot(hoodOffset);
+        }else{
+            setHood(0);
+        }
+    }
+    private void updateRotationalAimbot(){
+        int targetID = 24;
+        if (LoadHardwareClass.selectedAlliance == LoadHardwareClass.Alliance.BLUE){
+            targetID = 20;
+        }
+
+        if (!useCameraAim && vision.tagDetected(targetID) && Math.abs(rotation.target - rotation.getAngle()) < 10){
+            useCameraAim = true;
+        }
+        if (useCameraAim && !vision.tagDetected(targetID) || rotation.target > 360 || rotation.target < 0){
+            useCameraAim = false;
+        }
+
+        if (useCameraAim && aprilTagToggle){
+            vision.updateAprilTagProcessor();
+            rotation.target = rotation.getAngleAbsolute();
+            ControlSystem pid = ControlSystem.builder()
+                    .posPid(cameraCoefficients)
+                    .build();
+            pid.setGoal(new KineticState(0));
+            AprilTagVisionSystem.PoseRBE tagPose = vision.getRBE(targetID);
+            if (tagPose != null){
+                cameraTurretError = tagPose.b;
+                rotation.setPower(-pid.calculate(new KineticState(tagPose.b)));
+            }
+        }else{
+            if (LoadHardwareClass.selectedAlliance == LoadHardwareClass.Alliance.RED){
+                rotation.setAngle(Math.min(Math.max(0, rotationalAimbotLocalizer()), 360), -Math.toDegrees(Robot.drivetrain.follower.getAngularVelocity()));
+            }else{
+                rotation.setAngle(Math.min(Math.max(0, rotationalAimbotLocalizer()), 360), -Math.toDegrees(Robot.drivetrain.follower.getAngularVelocity()));
+            }
+        }
+    }
+    private void updateHoodAimbot(double offset){
         // Set the hood angle
         Pose goalPose = new Pose(0,144,0);
         if (LoadHardwareClass.selectedAlliance == LoadHardwareClass.Alliance.RED) {goalPose = new Pose(144, 144, 0);}
-        setHood(hoodLUT.get(Robot.drivetrain.follower.getPose().distanceFrom(goalPose)) + hoodOffset);
+        if (robotZone.isInside(LoadHardwareClass.FarLaunchZone)){
+            setHood(hoodLUTfar.get(Robot.drivetrain.follower.getPose().distanceFrom(goalPose)));
+        }else{
+            setHood(hoodLUTnear.get(Robot.drivetrain.follower.getPose().distanceFrom(goalPose)));
+        }
+        setHood(getHood() + offset);
+    }
+
+    /**
+     * Calculates the target angle to rotate the turret to in order to aim at the correct goal. </br>
+     * Currently uses Pinpoint Odometry and trigonometry to get the angle.
+     */
+    public double rotationalAimbotLocalizer (){
+        Pose goalPose = calcGoalPose();
+
+        return (Math.toDegrees(Math.atan2(
+                goalPose.getY()-Robot.drivetrain.follower.getPose().getY(),
+                goalPose.getX()-Robot.drivetrain.follower.getPose().getX())
+        ) - Math.toDegrees(Robot.drivetrain.follower.getPose().getHeading()) + 90)%360;
+    }
+
+    public static Pose rotationalNearGoalPose = new Pose(8, 136);
+    public static Pose rotationalFarGoalPose = new Pose(8, 136);
+
+    /**
+     * Calculates the proper goal pose
+     * @return a pose of the rotational aimbot's target position.
+     */
+    public Pose calcGoalPose(){
+        robotZone.setPosition(Robot.drivetrain.follower.getPose().getX(), Robot.drivetrain.follower.getPose().getY());
+        robotZone.setRotation(Robot.drivetrain.follower.getPose().getHeading());
+
+        Pose farPose = rotationalFarGoalPose;
+        Pose nearPose = rotationalNearGoalPose;
+
+        if (LoadHardwareClass.selectedAlliance == LoadHardwareClass.Alliance.RED) {
+            nearPose = nearPose.mirror();
+            farPose = farPose.mirror();
+        }
+
+        if(robotZone.isInside(LoadHardwareClass.FarLaunchZone)){
+            return farPose;
+        }else{
+            return nearPose;
+        }
     }
 
     /**
@@ -207,7 +299,7 @@ public class Turret {
      */
     public void setGateState(gatestate state){
         if (state == gatestate.CLOSED){
-            gate.setAngle(0.47);
+            gate.setAngle(0.534);
         }else if (state == gatestate.OPEN){
             gate.setAngle(0.5);
         }
@@ -230,17 +322,19 @@ public class Turret {
     }
 
     /**
-     * Calculates the target angle to rotate the turret to in order to aim at the correct goal. </br>
-     * Currently uses Pinpoint Odometry and trigonometry to get the angle.
+     * Gets the current state of the turret gate.
+     * Outputs one of the following modes.
+     * <ul>
+     *     <li><code>gatestate.OPEN</code></li>
+     *     <li><code>gatestate.CLOSED</code></li>
+     * </ul>
      */
-    public double calcLocalizer (){
-        Pose goalPose = new Pose(0-posOffset,144+posOffset,0);
-        if (LoadHardwareClass.selectedAlliance == LoadHardwareClass.Alliance.RED) {goalPose = new Pose(144+posOffset, 144+posOffset, 0);}
-
-        return (Math.toDegrees(Math.atan2(
-                goalPose.getY()-Robot.drivetrain.follower.getPose().getY(),
-                goalPose.getX()-Robot.drivetrain.follower.getPose().getX())
-        ) - Math.toDegrees(Robot.drivetrain.follower.getPose().getHeading()) + 90)%360;
+    public gatestate getGate(){
+        if (gate.getAngle() == 0.5){
+            return gatestate.OPEN;
+        } else {
+            return gatestate.CLOSED;
+        }
     }
 
     /**
@@ -265,12 +359,8 @@ public class Turret {
     public double getFlywheelRPM(){
         return flywheel.getRPM();
     }
-    public int getFlywheelPercent(){
-        return (int) Math.round(Robot.turret.getFlywheelRPM()/ Robot.turret.getFlywheelCurrentMaxSpeed() *100);
-    }
-
-    public boolean isFlywheelReadyToShoot(){
-        return getFlywheelRPM() > getFlywheelCurrentMaxSpeed() - 100;
+    public boolean isFlywheelReady(){
+        return flywheel.getRPM() > getFlywheelCurrentMaxSpeed()-150;
     }
 
     /**
@@ -302,17 +392,28 @@ public class Turret {
     /**
      * Updates the flywheel PID. Must be called every loop.
      */
-    public void updateFlywheel(){
+    public void updateFlywheel() {
         robotZone.setPosition(Robot.drivetrain.follower.getPose().getX(), Robot.drivetrain.follower.getPose().getY());
         robotZone.setRotation(Robot.drivetrain.follower.getPose().getHeading());
+
+        Pose goalPose = new Pose(0,144,0);
+        if (LoadHardwareClass.selectedAlliance == LoadHardwareClass.Alliance.RED) {goalPose = new Pose(144, 144, 0);}
 
         opMode.telemetry.addData("In Far Zone", robotZone.isInside(LoadHardwareClass.FarLaunchZone));
         opMode.telemetry.addData("In Near Zone", robotZone.isInside(LoadHardwareClass.ReallyNearLaunchZoneRed));
 
-        if (robotZone.isInside(LoadHardwareClass.FarLaunchZone)){
+        if (robotZone.isInside(LoadHardwareClass.FarLaunchZone)) {
             targetRPM = flywheelFarSpeed;
             actualFlywheelCoefficients = flywheelCoefficients4200;
             actualFlywheelFFCoefficients = flywheelFFCoefficients4200;
+        }else if (Robot.drivetrain.distanceFromGoal() < 60){
+            targetRPM = flywheelReallyNearSpeed;
+            actualFlywheelCoefficients = flywheelCoefficients3000;
+            actualFlywheelFFCoefficients = flywheelFFCoefficients3000;
+        }else if (Robot.drivetrain.distanceFromGoal() > 90){
+            targetRPM = flywheelFarNearSpeed;
+            actualFlywheelCoefficients = flywheelCoefficients3500;
+            actualFlywheelFFCoefficients = flywheelFFCoefficients3500;
         }else{
             targetRPM = flywheelNearSpeed;
             actualFlywheelCoefficients = flywheelCoefficients3500;

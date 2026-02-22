@@ -5,6 +5,7 @@ import com.qualcomm.robotcore.eventloop.opmode.OpMode;
 import com.qualcomm.robotcore.hardware.DcMotor;
 import com.qualcomm.robotcore.hardware.DcMotorSimple;
 
+import org.firstinspires.ftc.robotcore.external.navigation.CurrentUnit;
 import org.firstinspires.ftc.robotcore.external.navigation.DistanceUnit;
 
 @Configurable
@@ -20,8 +21,9 @@ public class Intake {
         AUTO_INTAKING,
         INTAKING,
         SHOOTING,
-        IDLE,
+        NO_BELT,
         REVERSING,
+        REVERSE_NOBELT,
         OFF
     }
 
@@ -78,13 +80,20 @@ public class Intake {
         }else if (direction == intakeMode.REVERSING){
             intake.setPower(-1);
             belt.setPower(-1);
-        }else if (direction == intakeMode.IDLE){
-            intake.setPower(0.1);
+        }else if (direction == intakeMode.NO_BELT){
+            intake.setPower(1);
+            belt.setPower(0);
+        }else if (direction == intakeMode.REVERSE_NOBELT){
+            intake.setPower(-1);
             belt.setPower(0);
         }else{
             intake.setPower(0);
             belt.setPower(0);
         }
+    }
+
+    public double getCurrent(){
+        return intake.getCurrent(CurrentUnit.AMPS);
     }
 
     /**
@@ -107,6 +116,8 @@ public class Intake {
             return intakeMode.NO_BELT;
         }else if (intakePower == -1 && beltPower == -1){
             return intakeMode.REVERSING;
+        }else if (intakePower == -1 && beltPower == 0){
+            return intakeMode.REVERSE_NOBELT;
         }else{
             return intakeMode.OFF;
         }

@@ -13,7 +13,10 @@ import com.qualcomm.robotcore.hardware.NormalizedColorSensor;
 import com.qualcomm.robotcore.hardware.NormalizedRGBA;
 import com.qualcomm.robotcore.hardware.Servo;
 
+import org.firstinspires.ftc.robotcore.external.navigation.CurrentUnit;
 import org.firstinspires.ftc.robotcore.external.navigation.DistanceUnit;
+import org.firstinspires.ftc.teamcode.LOADCode.Main_.Hardware_.LoadHardwareClass;
+import org.firstinspires.ftc.teamcode.Prism.GoBildaPrismDriver;
 
 import dev.nextftc.control.ControlSystem;
 import dev.nextftc.control.KineticState;
@@ -142,6 +145,12 @@ public class Devices {
         public void setOffsetDegrees(double degrees){
             setOffsetTicks(degrees * (ticksPerRotation/360));
         }
+        public double getOffsetTicks(){
+            return offset;
+        }
+        public double getOffsetDegrees(){
+            return offset/(ticksPerRotation/360);
+        }
         /**
          * Sets the runMode of the motor.
          * @param runMode The mode to set the motor to.
@@ -249,8 +258,11 @@ public class Devices {
             velPID.setGoal(new KineticState(0, degreesPerSecond));
             setPower(velPID.calculate(currentKineticState));
         }
-    }
 
+        public double getCurrent(CurrentUnit units){
+            return motorObject.getCurrent(units);
+        }
+    }
     public static class ServoClass {
         private Servo servo;
 
@@ -280,7 +292,6 @@ public class Devices {
             return servo.getPosition();
         }
     }
-
     public static class REVColorSensorV3Class {
         private NormalizedColorSensor sensor;
 
@@ -304,7 +315,6 @@ public class Devices {
             return ((DistanceSensor) sensor).getDistance(units);
         }
     }
-
     public static class DualProximitySensorClass {
         private final REVColorSensorV3Class sensor1 = new REVColorSensorV3Class();
         private final REVColorSensorV3Class sensor2 = new REVColorSensorV3Class();
@@ -330,7 +340,6 @@ public class Devices {
             return new double[]{sensor1.getDistance(units), sensor2.getDistance(units)};
         }
     }
-
     public static class REVHallEffectSensorClass {
         private DigitalChannel sensor;
 
@@ -343,4 +352,56 @@ public class Devices {
             return !sensor.getState();
         }
     }
+    public enum StripState {
+        PROGRESS,
+        BLINK,
+        OFF
+    }
+    public static class GoBildaPrismBarClass {
+        // Maximum length of 4 daisy chained strips is 36 (12 + 12 + 6 + 6)
+        // Scrimmage length of 2 daisy chained strips is 24 (12 + 12)
+
+        // Artboards current status:
+        GoBildaPrismDriver.Artboard solidRED = GoBildaPrismDriver.Artboard.ARTBOARD_0;
+        GoBildaPrismDriver.Artboard solidBLUE = GoBildaPrismDriver.Artboard.ARTBOARD_1;
+        GoBildaPrismDriver.Artboard blinkingRED = GoBildaPrismDriver.Artboard.ARTBOARD_2;
+        GoBildaPrismDriver.Artboard blinkingBLUE = GoBildaPrismDriver.Artboard.ARTBOARD_3;
+        GoBildaPrismDriver.Artboard rainbow = GoBildaPrismDriver.Artboard.ARTBOARD_4;
+
+        GoBildaPrismDriver prism;
+        int stripBrightness = 25;
+        public void init(@NonNull OpMode opmode, int stripLength){
+            prism = opmode.hardwareMap.get(GoBildaPrismDriver.class, "prism");
+            prism.setStripLength(stripLength);
+            prism.clearAllAnimations();
+        }
+
+        public void setStripBrightness(int brightness){
+            stripBrightness = brightness;
+        }
+
+        public void setDisplayedArtboard(GoBildaPrismDriver.Artboard board){
+            prism.loadAnimationsFromArtboard(board);
+        }
+
+        public void setStripRainbow(){
+            setDisplayedArtboard(rainbow);
+        }
+
+        public void setSolidAllianceDisplay(LoadHardwareClass.Alliance alliance){
+            if (alliance == LoadHardwareClass.Alliance.RED){
+                setDisplayedArtboard(solidRED);
+            }else if (alliance == LoadHardwareClass.Alliance.BLUE){
+                setDisplayedArtboard(solidBLUE);
+            }
+        }
+        public void setBlinkingAllianceDisplay(LoadHardwareClass.Alliance alliance){
+            if (alliance == LoadHardwareClass.Alliance.RED){
+                setDisplayedArtboard(blinkingRED);
+            }else if (alliance == LoadHardwareClass.Alliance.BLUE){
+                setDisplayedArtboard(blinkingBLUE);
+            }
+        }
+    }
 }
+

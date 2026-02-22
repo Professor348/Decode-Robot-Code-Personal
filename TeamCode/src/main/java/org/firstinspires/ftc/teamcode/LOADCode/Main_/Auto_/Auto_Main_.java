@@ -5,8 +5,10 @@ import static dev.nextftc.extensions.pedro.PedroComponent.follower;
 
 import androidx.annotation.NonNull;
 
+import com.pedropathing.geometry.BezierLine;
 import com.pedropathing.geometry.Pose;
 import com.qualcomm.robotcore.eventloop.opmode.Autonomous;
+import com.skeletonarmy.marrow.TimerEx;
 import com.skeletonarmy.marrow.prompts.OptionPrompt;
 import com.skeletonarmy.marrow.prompts.Prompter;
 
@@ -19,6 +21,8 @@ import org.firstinspires.ftc.teamcode.LOADCode.Main_.Hardware_.LoadHardwareClass
 import org.firstinspires.ftc.teamcode.pedroPathing.Constants;
 
 import dev.nextftc.core.commands.delays.Delay;
+import dev.nextftc.core.commands.delays.WaitUntil;
+import dev.nextftc.core.commands.groups.ParallelRaceGroup;
 import dev.nextftc.core.commands.groups.SequentialGroup;
 import dev.nextftc.core.commands.utility.InstantCommand;
 import dev.nextftc.extensions.pedro.PedroComponent;
@@ -27,6 +31,7 @@ import dev.nextftc.ftc.NextFTCOpMode;
 @Autonomous(name = "Auto_Main_", group = "Main", preselectTeleOp="Teleop_Main_")
 public class Auto_Main_ extends NextFTCOpMode {
 
+    TimerEx timer25Sec = new TimerEx(25);
     // Variable to store the selected auto program
     Auto selectedAuto = null;
     // Create the prompter object for selecting Alliance and Auto
@@ -58,26 +63,37 @@ public class Auto_Main_ extends NextFTCOpMode {
                 ));
         prompter.prompt("auto",
                 new OptionPrompt<>("Select Auto",
+                        new MOE_365_FAR(),
+                        new Near_15Ball(),
+                        new Near_15Ball2(),
                         new Near_12Ball(),
                         new Near_9Ball(),
-                        new Leave_Far_Generic()
-                        //new test_Auto(),
-                        //new Complex_Test_Auto()
+                        new Far_9Ball(),
+                        new Far_6Ball(),
+                        new Far_3Ball()
+                        //new test()
                 ));
         prompter.onComplete(() -> {
                     selectedAlliance = prompter.get("alliance");
                     selectedAuto = prompter.get("auto");
-                    telemetry.addData("Selection", "Complete");
-                    telemetry.addData("Alliance", selectedAlliance.toString());
-                    telemetry.addData("Auto", selectedAuto);
                     telemetry.update();
                     // Build paths
-                    paths.buildPaths(selectedAlliance, follower());
+                    paths.buildPaths(follower());
                     // Initialize all hardware of the robot
-                    Robot.init(paths.autoMirror(selectedAuto.getStartPose(), selectedAlliance), follower());
+                    Robot.init(selectedAuto.getStartPose(), follower());
                     while (opModeInInit() && Robot.turret.zeroTurret()){
+                        telemetry.addLine("TURRET ZEROING");
+                        telemetry.addData("Selection", "Complete");
+                        telemetry.addData("Alliance", selectedAlliance.toString());
+                        telemetry.addData("Auto", selectedAuto);
+                        telemetry.update();
                         sleep(0);
                     }
+            telemetry.addLine("TURRET READY");
+            telemetry.addData("Selection", "Complete");
+            telemetry.addData("Alliance", selectedAlliance.toString());
+            telemetry.addData("Auto", selectedAuto);
+            telemetry.update();
         });
     }
 
@@ -88,9 +104,11 @@ public class Auto_Main_ extends NextFTCOpMode {
 
     @Override
     public void onStartButtonPressed() {
+        Robot.lights.setSolidAllianceDisplay(selectedAlliance);
         // Schedule the proper auto
         selectedAuto.runAuto();
         turretOn = selectedAuto.getTurretEnabled();
+        timer25Sec.restart();
 
         // Indicate that initialization is done
         telemetry.addLine("Initialized");
@@ -103,17 +121,13 @@ public class Auto_Main_ extends NextFTCOpMode {
         telemetry.addData("Alliance", selectedAlliance);
         Robot.turret.updateAimbot(turretOn, true, 0);
         Robot.turret.updateFlywheel();
-
         MecanumDrivetrainClass.robotPose = Robot.drivetrain.follower.getPose();
-
-        telemetry.addLine();
-        telemetry.addData("FarStart", paths.farStart);
-        telemetry.addData("FarShoot", paths.noTurretFarShoot);
         telemetry.update();
     }
 
     @Override
     public void onStop(){
+        Robot.lights.setStripRainbow();
         Robot.drivetrain.follower.holdPoint(Robot.drivetrain.follower.getPose());
         MecanumDrivetrainClass.robotPose = Robot.drivetrain.follower.getPose();
     }
@@ -123,21 +137,14 @@ public class Auto_Main_ extends NextFTCOpMode {
      * The methods runAuto() and ToString() must be overridden for each auto.
      */
     abstract static class Auto{
-//        /**
-//         * This constructor must be called from the child class using <code>super()</code>
-//         * @param startingPose Indicates the starting pose of the robot
-//         * @param runTurret Indicates whether to run the turret auto aim functions
-//         */
-//        Auto(Pose startingPose, Boolean runTurret){
-//            turretOn = runTurret;
-//            startPose = startingPose;
-//        }
-//        Auto(Pose startingPose){
-//            turretOn = true;
-//            startPose = startingPose;
-//        }
-
+        /**
+         * @return The start pose of the robot for this auto.
+         */
         abstract Pose getStartPose();
+
+        /**
+         * @return A boolean indicating whether the turret is enabled.
+         */
         abstract boolean getTurretEnabled();
 
         /** Override this to schedule the auto command*/
@@ -148,46 +155,105 @@ public class Auto_Main_ extends NextFTCOpMode {
         public abstract String toString();
     }
 
-    private class Leave_Far_Generic extends Auto{
-        public Pose startPose = paths.farStart;
-        public boolean turretEnabled = false;
-
+    private class Far_9Ball extends Auto{
         @Override
         public Pose getStartPose(){
-            return startPose;
+            return paths.farStart;
         }
         @Override
         public boolean getTurretEnabled(){
-            return turretEnabled;
+            return true;
         }
 
         @Override
         public void runAuto(){
             new SequentialGroup(
-                    Commands.runPath(paths.farStart_to_NoTurret_FarShoot, true, 1),
+                    Commands.runPath(paths.farStart_to_farShoot, true, 1),
                     Commands.shootBalls(),
+                    Commands.setFlywheelState(Turret.flywheelState.ON),
                     Commands.setIntakeMode(Intake.intakeMode.INTAKING),
-                    Commands.runPath(paths.farShoot_noTurret_to_farPreload, true, 1),
-                    Commands.setIntakeMode(Intake.intakeMode.OFF)
+                    Commands.runPath(paths.farShoot_to_farPreload, true, 1),
+                    Commands.runPath(paths.farPreload_to_farShoot, true, 1),
+                    Commands.shootBalls(),
+                    Commands.setFlywheelState(Turret.flywheelState.ON),
+                    Commands.setIntakeMode(Intake.intakeMode.INTAKING),
+                    Commands.runPath(paths.farShoot_to_hpPreload, true, 1),
+                    Commands.runPath(paths.hpPreload_to_farShoot, true, 1),
+                    Commands.shootBalls(),
+                    Commands.runPath(paths.farShoot_to_farLeave, true, 1)
             ).schedule();
         }
 
         @NonNull
         @Override
-        public String toString(){return "Far Zone No Turret Generic";}
+        public String toString(){return "Far 9 Ball";}
     }
-
-    private class Near_9Ball extends Auto{
-        public Pose startPose = paths.nearStart;
-        public boolean turretEnabled = true;
-
+    private class Far_6Ball extends Auto{
         @Override
         public Pose getStartPose(){
-            return startPose;
+            return paths.farStart;
         }
         @Override
         public boolean getTurretEnabled(){
-            return turretEnabled;
+            return true;
+        }
+
+        @Override
+        public void runAuto(){
+            new SequentialGroup(
+                    Commands.runPath(paths.farStart_to_farShoot, true, 1),
+                    Commands.shootBalls(),
+                    Commands.setFlywheelState(Turret.flywheelState.ON),
+                    Commands.setIntakeMode(Intake.intakeMode.INTAKING),
+                    Commands.runPath(paths.farShoot_to_farPreload, true, 1),
+                    Commands.runPath(paths.farPreload_to_farShoot, true, 1),
+                    Commands.shootBalls(),
+                    Commands.runPath(paths.farShoot_to_farLeave, true, 1)
+            ).schedule();
+        }
+
+        @NonNull
+        @Override
+        public String toString(){return "Far 6 Ball";}
+    }
+    private class Far_3Ball extends Auto{
+
+        @Override
+        Pose getStartPose() {
+            return paths.farStart;
+        }
+
+        @Override
+        boolean getTurretEnabled() {
+            return true;
+        }
+
+        @Override
+        void runAuto() {
+            new SequentialGroup(
+                    Commands.setFlywheelState(Turret.flywheelState.ON),
+                    Commands.runPath(paths.farStart_to_farShoot, true, 1),
+                    Commands.shootBalls(),
+                    new WaitUntil(() -> timer25Sec.isDone()),
+                    Commands.setIntakeMode(Intake.intakeMode.INTAKING),
+                    Commands.runPath(paths.farShoot_to_hpPreload, true, 1)
+            ).schedule();
+        }
+
+        @NonNull
+        @Override
+        public String toString() {
+            return "Far 3 Ball + HP Intake";
+        }
+    }
+    private class Near_9Ball extends Auto{
+        @Override
+        public Pose getStartPose(){
+            return paths.nearStart;
+        }
+        @Override
+        public boolean getTurretEnabled(){
+            return true;
         }
 
         @Override
@@ -213,20 +279,16 @@ public class Auto_Main_ extends NextFTCOpMode {
 
         @NonNull
         @Override
-        public String toString(){return "Near Zone 9 Ball Auto";}
+        public String toString(){return "Near 9 Ball";}
     }
-
     private class Near_12Ball extends Auto{
-        public Pose startPose = paths.nearStart;
-        public boolean turretEnabled = true;
-
         @Override
         public Pose getStartPose(){
-            return startPose;
+            return paths.nearStart;
         }
         @Override
         public boolean getTurretEnabled(){
-            return turretEnabled;
+            return true;
         }
 
         @Override
@@ -236,17 +298,14 @@ public class Auto_Main_ extends NextFTCOpMode {
                     new InstantCommand(Commands.setFlywheelState(Turret.flywheelState.ON)),
                     Commands.runPath(paths.nearStart_to_midShoot, true, 1),
                     Commands.shootBalls(),
-                    Commands.setFlywheelState(Turret.flywheelState.ON),
                     Commands.setIntakeMode(Intake.intakeMode.INTAKING),
                     Commands.runPath(paths.midShoot_to_nearPreload, true, 1),
                     Commands.runPath(paths.nearPreload_to_midShoot, true, 1),
                     Commands.shootBalls(),
-                    Commands.setFlywheelState(Turret.flywheelState.ON),
                     Commands.setIntakeMode(Intake.intakeMode.INTAKING),
                     Commands.runPath(paths.midShoot_to_midPreload, true, 1),
                     Commands.runPath(paths.midPreload_to_midShoot, true, 1),
                     Commands.shootBalls(),
-                    Commands.setFlywheelState(Turret.flywheelState.ON),
                     Commands.setIntakeMode(Intake.intakeMode.INTAKING),
                     Commands.runPath(paths.midShoot_to_farPreload, true, 1),
                     Commands.runPath(paths.farPreload_to_midShoot, true, 1),
@@ -257,79 +316,153 @@ public class Auto_Main_ extends NextFTCOpMode {
 
         @NonNull
         @Override
-        public String toString(){return "Near Zone 12 Ball Auto";}
+        public String toString(){return "Near 12 Ball";}
     }
-
-    /**
-     * This auto starts at the far zone
-     */
-    private class Complex_Test_Auto extends Auto{
-        public Pose startPose = paths.farStart;
-        public boolean turretEnabled = true;
+    private class Near_15Ball extends Auto{
 
         @Override
-        public Pose getStartPose(){
-            return startPose;
+        Pose getStartPose() {
+            return paths.nearStart;
         }
+
         @Override
-        public boolean getTurretEnabled(){
-            return turretEnabled;
+        boolean getTurretEnabled() {
+            return true;
         }
 
         @Override
         void runAuto() {
             new SequentialGroup(
-                    new Delay(1),
-                    //Commands.shootBalls(),
+                    Commands.setFlywheelState(Turret.flywheelState.ON),
+                    Commands.runPath(paths.nearStart_to_midShoot, true, 1),
+                    Commands.shootBalls(),
                     Commands.setIntakeMode(Intake.intakeMode.INTAKING),
-                    Commands.runPath(paths.farStart_to_farPreload, true, 1),
-                    Commands.setIntakeMode(Intake.intakeMode.OFF),
-                    Commands.runPath(paths.farPreload_to_farShoot, true, 1),
-                    //Commands.shootBalls(),
+                    Commands.runPath(paths.midShoot_to_midPreload, true, 1),
+                    Commands.runPath(paths.midPreload_to_midShoot, true, 1),
+                    Commands.shootBalls(),
                     Commands.setIntakeMode(Intake.intakeMode.INTAKING),
-                    Commands.runPath(paths.farStart_to_midPreload, true, 1),
+                    Commands.runPath(paths.midShoot_to_openGateIntake, true, 1),
+                    Commands.waitForArtifacts(),
+                    Commands.runPath(paths.openGateIntake_to_midShoot, true, 1),
+                    Commands.shootBalls(),
+                    Commands.setIntakeMode(Intake.intakeMode.INTAKING),
+                    Commands.runPath(paths.midShoot_to_farPreload, true, 1),
                     Commands.setIntakeMode(Intake.intakeMode.OFF),
-                    Commands.runPath(paths.midPreload_to_farShoot, true, 1),
-                    //Commands.shootBalls(),
-                    Commands.runPath(paths.farShoot_to_farLeave, true, 1)
+                    Commands.runPath(paths.farPreload_to_midShoot, true, 1),
+                    Commands.shootBalls(),
+                    Commands.setIntakeMode(Intake.intakeMode.INTAKING),
+                    Commands.runPath(paths.midShoot_to_nearPreload, true, 1),
+                    Commands.runPath(paths.nearPreload_to_midShoot, false, 1),
+                    Commands.shootBalls(),
+                    Commands.runPath(paths.midShoot_to_nearLeave, true, 1)
             ).schedule();
         }
 
         @NonNull
         @Override
         public String toString() {
-            return "Complex Test Auto";
+            return "Near 15 Ball (With Far Spike Mark)";
         }
     }
-
-    private class test_Auto extends Auto{
-        public Pose startPose = paths.farStart;
-        public boolean turretEnabled = false;
+    private class Near_15Ball2 extends Auto{
 
         @Override
-        public Pose getStartPose(){
-            return startPose;
-        }
-        @Override
-        public boolean getTurretEnabled(){
-            return turretEnabled;
+        Pose getStartPose() {
+            return paths.nearStart;
         }
 
         @Override
-        public void runAuto(){
-            double tempSpeed = 1;
+        boolean getTurretEnabled() {
+            return true;
+        }
+
+        @Override
+        void runAuto() {
             new SequentialGroup(
-                    Commands.runPath(paths.farStart_to_farPreload,true,tempSpeed),
-                    Commands.runPath(paths.farPreload_to_farShoot,true,tempSpeed),
-                    Commands.runPath(paths.farShoot_to_midPreload, true, tempSpeed),
-                    Commands.runPath(paths.midPreload_to_midShoot, true, tempSpeed),
-                    Commands.runPath(paths.midShoot_to_nearPreload, true, tempSpeed),
-                    Commands.runPath(paths.nearPreload_to_nearShoot, true, tempSpeed)
+                    Commands.setFlywheelState(Turret.flywheelState.ON),
+                    Commands.runPath(paths.nearStart_to_midShoot, true, 1),
+                    Commands.shootBalls(),
+                    Commands.setIntakeMode(Intake.intakeMode.INTAKING),
+                    Commands.runPath(paths.midShoot_to_midPreload, true, 1),
+                    Commands.runPath(paths.midPreload_to_midShoot, true, 1),
+                    Commands.shootBalls(),
+                    Commands.setIntakeMode(Intake.intakeMode.INTAKING),
+                    Commands.runPath(paths.midShoot_to_openGateIntake, true, 1),
+                    Commands.waitForArtifacts(),
+                    Commands.runPath(paths.openGateIntake_to_midShoot, true, 1),
+                    Commands.shootBalls(),
+                    Commands.setIntakeMode(Intake.intakeMode.INTAKING),
+                    Commands.runPath(paths.midShoot_to_openGateIntake, true, 1),
+                    Commands.waitForArtifacts(),
+                    Commands.runPath(paths.openGateIntake_to_midShoot, true, 1),
+                    Commands.shootBalls(),
+                    Commands.setIntakeMode(Intake.intakeMode.INTAKING),
+                    Commands.runPath(paths.midShoot_to_nearPreload, true, 1),
+                    Commands.runPath(paths.nearPreload_to_midShoot, false, 1),
+                    Commands.shootBalls(),
+                    Commands.runPath(paths.midShoot_to_nearLeave, true, 1)
             ).schedule();
         }
 
         @NonNull
         @Override
-        public String toString(){return "Test Auto";}
+        public String toString() {
+            return "Near 15 Ball (No Far Spike Mark)";
+        }
+    }
+    private class MOE_365_FAR extends Auto{
+        @Override
+        public Pose getStartPose(){
+            return paths.farStart;
+        }
+        @Override
+        public boolean getTurretEnabled(){
+            return true;
+        }
+
+        @Override
+        public void runAuto(){
+            new SequentialGroup(
+                    new ParallelRaceGroup(
+                            new Delay(29),
+                            new SequentialGroup(
+                                    Commands.setFlywheelState(Turret.flywheelState.ON),
+                                    Commands.runPath(paths.farStart_to_farShoot, true, 1),
+                                    Commands.shootBalls(),
+                                    Commands.setIntakeMode(Intake.intakeMode.INTAKING),
+                                    Commands.runPath(paths.farShoot_to_farPreload, true, 1),
+                                    Commands.runPath(paths.farPreload_to_farShoot, true, 1),
+                                    Commands.shootBalls(),
+                                    Commands.setIntakeMode(Intake.intakeMode.INTAKING),
+                                    Commands.runPath(paths.farShoot_to_rampIntake, true, 1),
+                                    Commands.runPath(paths.rampIntake_to_farShoot, true, 1),
+                                    Commands.shootBalls(),
+                                    Commands.setIntakeMode(Intake.intakeMode.INTAKING),
+                                    Commands.runPath(paths.farShoot_to_hpPreload, true, 1),
+                                    Commands.runPath(paths.hpPreload_to_farShoot, true, 1),
+                                    Commands.shootBalls(),
+                                    Commands.setIntakeMode(Intake.intakeMode.INTAKING),
+                                    Commands.runPath(paths.farShoot_to_hpPreload, true, 1),
+                                    Commands.runPath(paths.hpPreload_to_farShoot, true, 1),
+                                    Commands.shootBalls(),
+                                    Commands.runPath(paths.farShoot_to_farLeave, true, 1)
+                            )
+                    ),
+                    Commands.runPath(
+                            Robot.drivetrain.follower.pathBuilder().addPath(
+                                    new BezierLine(
+                                            Robot.drivetrain.follower.getPose(),
+                                            paths.farLeave
+                                    )
+                            ).setLinearHeadingInterpolation(
+                                    Robot.drivetrain.follower.getPose().getHeading(),
+                                    paths.farLeave.getHeading()
+                            ).build(), true, 1)
+            ).schedule();
+        }
+
+        @NonNull
+        @Override
+        public String toString(){return "MOE 365 Far";}
     }
 }
