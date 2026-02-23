@@ -44,4 +44,9 @@ public class DataTypes {
             return new BasicFeedforwardParameters(kV, kA, kS);
         }
     }
+    public static enum AngleUnit {
+        RADIANS,
+        DEGREES,
+        TICKS
+    }
 }

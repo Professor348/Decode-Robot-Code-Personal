@@ -1,16 +1,23 @@
 package org.firstinspires.ftc.teamcode.Optimized;
 
+import static org.firstinspires.ftc.teamcode.Optimized.Utilities.degreesToTicks;
+import static org.firstinspires.ftc.teamcode.Optimized.Utilities.radiansToTicks;
+
+import androidx.annotation.NonNull;
+
 import com.qualcomm.robotcore.eventloop.opmode.OpMode;
 import com.qualcomm.robotcore.hardware.DcMotor;
 import com.qualcomm.robotcore.hardware.DcMotorSimple.Direction;
 import com.qualcomm.robotcore.hardware.DcMotor.ZeroPowerBehavior;
 import com.skeletonarmy.marrow.OpModeManager;
 
+import org.firstinspires.ftc.robotcore.external.navigation.AngleUnit;
 import org.firstinspires.ftc.teamcode.Optimized.DataTypes.PIDFFCoefficients;
 
 import dev.nextftc.control.ControlSystem;
 import dev.nextftc.control.KineticState;
 import dev.nextftc.control.feedback.PIDCoefficients;
+import kotlin.Unit;
 
 public class Devices {
     public static class DcMotorEx {
@@ -133,7 +140,7 @@ public class Devices {
                 }
             }
 
-            KineticState currentKineticState = new KineticState(getAngleAbsoluteTicks(), getVelocityTicks());
+            KineticState currentKineticState = new KineticState(getAngleAbsolute(), getVelocity());
             if (runMode == RunMode.RUN_USING_POS_PID){
                 if (motor.getMode() != DcMotor.RunMode.RUN_WITHOUT_ENCODER){
                     motor.setMode(DcMotor.RunMode.RUN_WITHOUT_ENCODER);
@@ -153,29 +160,104 @@ public class Devices {
                     .build();
         }
 
-        // TODO add javadoc comments to all these functions
-        public void setAngle(int angle, double velocity){
-            targetPos = angle;
-            targetVel = velocity;
+
+        /**
+         * Sets the target position of the motor
+         * @param angle The target angle in the specified units.
+         * @param velocity The target velocity in units/sec.
+         * @param units The units to be used for the angle & velocity.
+         */
+        public void setAngle(double angle, double velocity, @NonNull DataTypes.AngleUnit units){
+            switch (units) {
+                case TICKS:
+                    targetPos = (int) angle;
+                    targetVel = (int) velocity;
+                    break;
+                case DEGREES:
+                    targetPos = (int) degreesToTicks(angle, encoderResolution);
+                    targetVel = (int) degreesToTicks(velocity, encoderResolution);
+                    break;
+                case RADIANS:
+                    targetPos = (int) radiansToTicks(angle, encoderResolution);
+                    targetVel = (int) radiansToTicks(velocity, encoderResolution);
+                    break;
+            }
         }
-        public void setAngle(int angle){
-            setAngle(angle, 0);
+        /**
+         * Sets the target position of the motor
+         * @param angle The target angle in the specified units.
+         * @param units The units to be used for the angle.
+         */
+        public void setAngle(double angle, DataTypes.AngleUnit units){
+            setAngle(angle, 0, units);
+        }
+        /**
+         * Sets the target position of the motor
+         * @param angle The target angle in encoder ticks.
+         */
+        public void setAngle(double angle){
+            setAngle(angle, 0, DataTypes.AngleUnit.TICKS);
+        }
+        /**
+         * Sets the target position of the motor
+         * @param angle The target angle in encoder ticks.
+         * @param velocity The target velocity in encoder ticks/sec.
+         */
+        public void setAngle(double angle, double velocity){
+            setAngle(angle, velocity, DataTypes.AngleUnit.TICKS);
         }
 
+
+        /**
+         * @param power Ranges between -1 and 1. The power to apply to the motor.
+         */
         public void setPower(double power){
             motor.setPower(power);
         }
-        public double getAngleAbsoluteTicks(){
-            return motor.getCurrentPosition() + offset;
+
+
+        /**
+         * @param units The units to be used in the returned angle.
+         * @return The angle of the motor in the specified units.
+         */
+        public double getAngleAbsolute(@NonNull DataTypes.AngleUnit units){
+            double ticks = motor.getCurrentPosition() + offset;
+            switch (units) {
+                case DEGREES:
+                    return (ticks)/encoderResolution*360;
+                case RADIANS:
+                    return (ticks)/encoderResolution*(2*Math.PI);
+            }
+            return ticks;
         }
-        public double getAngleAbsoluteDegrees(){
-            return (getAngleAbsoluteTicks()/encoderResolution)*360;
+        /**
+         * @return The angle of the motor in encoder ticks.
+         */
+        public double getAngleAbsolute(){
+            return getAngleAbsolute(DataTypes.AngleUnit.TICKS);
         }
-        public double getVelocityTicks(){
-            return motor.getVelocity();
+
+
+        /**
+         * Gets the current velocity of the motor in the specified units.
+         * @param units The units of the returned value.
+         * @return The current velocity of the motor.
+         */
+        public double getVelocity(DataTypes.AngleUnit units){
+            double ticks = motor.getVelocity();
+            switch (units){
+                case DEGREES:
+                    return Utilities.ticksToDegrees(ticks, encoderResolution);
+                case RADIANS:
+                    return Utilities.ticksToRadians(ticks, encoderResolution);
+            }
+            return ticks;
         }
-        public double getVelocityDegrees(){
-            return (getVelocityTicks()/encoderResolution)*360;
+        /**
+         * @return The current velocity of the motor in encoder ticks per second.
+         */
+        public double getVelocity(){
+            return getVelocity(DataTypes.AngleUnit.TICKS);
         }
     }
 }
