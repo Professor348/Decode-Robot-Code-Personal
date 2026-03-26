@@ -311,7 +311,7 @@ public class Turret {
         robotZone.setRotation(Robot.drivetrain.follower.getPose().getHeading());
 
         opMode.telemetry.addData("In Far Zone", robotZone.isInside(LoadHardwareClass.FarLaunchZone));
-        opMode.telemetry.addData("In Near Zone", robotZone.isInside(LoadHardwareClass.ReallyNearLaunchZoneRed));
+        opMode.telemetry.addData("In Near Zone", robotZone.isInside(LoadHardwareClass.NearLaunchZoneRed));
 
         if (robotZone.isInside(LoadHardwareClass.FarLaunchZone)){
             targetRPM = flywheelFarSpeed;
