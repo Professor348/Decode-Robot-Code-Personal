@@ -36,7 +36,9 @@ import com.qualcomm.robotcore.eventloop.opmode.OpMode;
 import com.skeletonarmy.marrow.zones.Point;
 import com.skeletonarmy.marrow.zones.PolygonZone;
 
+import org.firstinspires.ftc.teamcode.LOADCode.Main_.Hardware_.Actuators_.Devices;
 import org.firstinspires.ftc.teamcode.LOADCode.Main_.Hardware_.Actuators_.Intake;
+import org.firstinspires.ftc.teamcode.LOADCode.Main_.Hardware_.Actuators_.Lift;
 import org.firstinspires.ftc.teamcode.LOADCode.Main_.Hardware_.Actuators_.Turret;
 import org.firstinspires.ftc.teamcode.LOADCode.Main_.Hardware_.Drivetrain_.MecanumDrivetrainClass;
 
@@ -54,6 +56,8 @@ public class LoadHardwareClass {
     public final MecanumDrivetrainClass drivetrain;
     public final Turret turret;
     public final Intake intake;
+    public final Lift lift;
+    public final Devices.GoBildaPrismBarClass lights;
 
     // Declare various enums & other variables that are useful across files
     public static Alliance selectedAlliance = null;
@@ -96,6 +100,8 @@ public class LoadHardwareClass {
         this.drivetrain = new MecanumDrivetrainClass();
         this.turret     = new Turret();
         this.intake     = new Intake();
+        this.lift       = new Lift();
+        this.lights     = new Devices.GoBildaPrismBarClass();
     }
 
     /**
@@ -105,14 +111,8 @@ public class LoadHardwareClass {
     public void init(Pose initialPose)    {
         // Initialize all subclasses
         drivetrain.init(myOpMode, initialPose);
-        turret.init(myOpMode, this);
-        intake.init(myOpMode);
-
-        // Misc telemetry
-        myOpMode.telemetry.addData(">", "Hardware Initialized");
-        myOpMode.telemetry.update();
+        init();
     }
-
     /**
      * Initializes all hardware for the robot.
      * Must be called once at the start of each op-mode.
@@ -120,11 +120,18 @@ public class LoadHardwareClass {
     public void init(Pose initialPose, Follower follower)    {
         // Initialize all subclasses
         drivetrain.init(myOpMode, initialPose, follower);
+        init();
+    }
+
+    private void init(){
         turret.init(myOpMode, this);
         intake.init(myOpMode);
+        lift.init(myOpMode);
+        lights.init(myOpMode, 36);
 
         // Misc telemetry
         myOpMode.telemetry.addData(">", "Hardware Initialized");
         myOpMode.telemetry.update();
     }
+
 }

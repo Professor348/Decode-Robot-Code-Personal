@@ -17,14 +17,49 @@
                 "viewState": {
                   "x": -670,
                   "y": 70,
-                  "zoom": -0.2612571403908114
+                  "zoom": -0.6381710945544748
                 }
               },
               "icon": "lucide-layout-dashboard",
               "title": "File Structure"
             }
+          },
+          {
+            "id": "3c98fecc6f5ddbb9",
+            "type": "leaf",
+            "state": {
+              "type": "canvas",
+              "state": {
+                "file": "Robot Wiring.canvas",
+                "viewState": {
+                  "x": 172.01440458960963,
+                  "y": 198.39842255593908,
+                  "zoom": -0.39938423496735836
+                }
+              },
+              "icon": "lucide-layout-dashboard",
+              "title": "Robot Wiring"
+            }
+          },
+          {
+            "id": "f3ed0e91d6b359a1",
+            "type": "leaf",
+            "state": {
+              "type": "canvas",
+              "state": {
+                "file": "Robot Wiring.canvas",
+                "viewState": {
+                  "x": -262.5418292535084,
+                  "y": 150.85601013637654,
+                  "zoom": -0.5506108409953099
+                }
+              },
+              "icon": "lucide-layout-dashboard",
+              "title": "Robot Wiring"
+            }
           }
-        ]
+        ],
+        "currentTab": 2
       }
     ],
     "direction": "vertical"
@@ -180,12 +215,21 @@
       "daily-notes:Open today's daily note": false,
       "templates:Insert template": false,
       "command-palette:Open command palette": false,
-      "bases:Create new base": false
+      "bases:Create new base": false,
+      "theme-toggle:Toggle to dark mode": false
     }
   },
-  "active": "d3b4cee07f48b93b",
+  "active": "f3ed0e91d6b359a1",
   "lastOpenFiles": [
+    "File Structure.canvas",
+    "File Structure Dark.png",
+    "File Structure Light.png",
+    "Robot Wiring Light.png",
+    "Robot Wiring Dark.png",
+    "Robot Wiring.canvas",
+    "File Structure_Light.png",
+    "Robot_Wiring.png",
     "File Structure.png",
-    "File Structure Light.png"
+    "Robot Controls.png"
   ]
 }

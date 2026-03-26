@@ -5,6 +5,7 @@ import com.qualcomm.robotcore.eventloop.opmode.OpMode;
 import com.qualcomm.robotcore.hardware.DcMotor;
 import com.qualcomm.robotcore.hardware.DcMotorSimple;
 
+import org.firstinspires.ftc.robotcore.external.navigation.CurrentUnit;
 import org.firstinspires.ftc.robotcore.external.navigation.DistanceUnit;
 
 @Configurable
@@ -17,11 +18,9 @@ public class Intake {
     public final Devices.DualProximitySensorClass bottomSensor = new Devices.DualProximitySensorClass();
 
     public enum intakeMode {
-        INTAKING,
-        SHOOTING,
-        NO_BELT,
-        REVERSING,
-        OFF
+        OFF,
+        REVERSE,
+        ON
     }
 
     public enum transferState {
@@ -29,7 +28,8 @@ public class Intake {
         DOWN
     }
 
-    public static double proximitySensorThreshold = 20;
+    public static double topProximitySensorThreshold = 50;
+    public static double bottomProximitySensorThreshold = 30;
 
     public void init(OpMode opmode){
         intake.init(opmode, "intake");
@@ -46,64 +46,66 @@ public class Intake {
 
         topSensor.setGain(2);
         topSensor.units = DistanceUnit.MM;
-        topSensor.threshold = proximitySensorThreshold;
+        topSensor.threshold = topProximitySensorThreshold;
         bottomSensor.setGain(2);
         bottomSensor.units = DistanceUnit.MM;
-        bottomSensor.threshold = proximitySensorThreshold;
+        bottomSensor.threshold = bottomProximitySensorThreshold;
     }
 
     /**
-     * @param direction
-     * Takes the following inputs
-     * <ul>
-     *     <li><code>intakeMode.INTAKING</code></li>
-     *     <li><code>intakeMode.SHOOTING</code></li>
-     *     <li><code>intakeMode.REVERSING</code></li>
-     *     <li><code>intakeMode.OFF</code></li>
-     * </ul>
+     * Sets the current mode of the intake
+     * @param intakeDirection the current mode of the Intake
+     * @param transferDirection the current mode of the Transfer
      */
-    public void setMode(intakeMode direction){
-        if (direction == intakeMode.INTAKING){
-            //if (!(getTopSensorState() && getBottomSensorState())){
-                belt.setPower(1);
-            //}
-            intake.setPower(1);
-        }else if (direction == intakeMode.SHOOTING){
-            intake.setPower(0);
-            belt.setPower(1);
-        }else if (direction == intakeMode.REVERSING){
-            intake.setPower(-1);
-            belt.setPower(-1);
-        }else if (direction == intakeMode.NO_BELT){
-            intake.setPower(1);
-            belt.setPower(0);
-        }else{
-            intake.setPower(0);
-            belt.setPower(0);
+    public void setMode(intakeMode intakeDirection, intakeMode transferDirection) {
+        switch (intakeDirection){
+            case OFF:
+                intake.setPower(0);
+                break;
+            case ON:
+                intake.setPower(1);
+                break;
+            case REVERSE:
+                intake.setPower(-1);
+                break;
         }
+        switch (transferDirection){
+            case OFF:
+                belt.setPower(0);
+                break;
+            case ON:
+                belt.setPower(1);
+                break;
+            case REVERSE:
+                belt.setPower(-1);
+                break;
+        }
+    }
+
+    public double getCurrent(){
+        return intake.getCurrent(CurrentUnit.AMPS);
     }
 
     /**
      * Outputs one of the following modes
      * <ul>
-     *     <li><code>intakeMode.INTAKING</code></li>
-     *     <li><code>intakeMode.SHOOTING</code></li>
-     *     <li><code>intakeMode.REVERSING</code></li>
+     *     <li><code>intakeMode.INTAKE_ALL</code></li>
+     *     <li><code>intakeMode.INTAKE_NOINTAKE</code></li>
+     *     <li><code>intakeMode.REVERSE_ALL</code></li>
      *     <li><code>intakeMode.OFF</code></li>
      * </ul>
      */
-    public intakeMode getMode(){
+    public intakeMode getIntakeMode(){
         double intakePower = intake.getPower();
-        double beltPower = belt.getPower();
-        if (intakePower == 1 && beltPower == 1){
-            return intakeMode.INTAKING;
-        }else if (intakePower == 0 && beltPower == 1){
-            return intakeMode.SHOOTING;
-        }else if (intakePower == -1 && beltPower == -1){
-            return intakeMode.REVERSING;
-        }else{
-            return intakeMode.OFF;
+        switch ((int) intakePower){
+            case 0:
+                return intakeMode.OFF;
+            case 1:
+                return intakeMode.ON;
+            case -1:
+                return intakeMode.REVERSE;
         }
+        return intakeMode.OFF;
     }
 
     public void setTransfer(transferState state) {
@@ -117,11 +119,11 @@ public class Intake {
     }
 
     public boolean getTopSensorState(){
-        topSensor.threshold = proximitySensorThreshold;
+        topSensor.threshold = topProximitySensorThreshold;
         return topSensor.objectDetected();
     }
     public boolean getBottomSensorState(){
-        bottomSensor.threshold = proximitySensorThreshold;
+        bottomSensor.threshold = bottomProximitySensorThreshold;
         return bottomSensor.objectDetected();
     }
 }
