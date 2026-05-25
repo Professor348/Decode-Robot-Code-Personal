@@ -9,18 +9,81 @@ import com.skeletonarmy.marrow.OpModeManager;
 
 public class Motor {
 
-    public static enum RPM{
-        GOBILDA_6000,
-        GOBILDA_1620,
-        GOBILDA_1150,
-        GOBILDA_435,
-        GOBILDA_312,
-        GOBILDA_223,
-        GOBILDA_117,
-        GOBILDA_84,
-        GOBILDA_60,
-        GOBILDA_43,
-        GOBILDA_30
+    public enum RPM{
+        GOBILDA_6000 {
+            @Override
+            double getTPR() {
+                return 28;
+            }
+        },
+        GOBILDA_1620 {
+            @Override
+            double getTPR() {
+                return 103.8;
+            }
+        },
+        GOBILDA_1150 {
+            @Override
+            double getTPR() {
+                return 145.1;
+            }
+        },
+        GOBILDA_435 {
+            @Override
+            double getTPR() {
+                return 384.5;
+            }
+        },
+        GOBILDA_312 {
+            @Override
+            double getTPR() {
+                return 537.7;
+            }
+        },
+        GOBILDA_223 {
+            @Override
+            double getTPR() {
+                return 751.8;
+            }
+        },
+        GOBILDA_117 {
+            @Override
+            double getTPR() {
+                return 1425.1;
+            }
+        },
+        GOBILDA_84 {
+            @Override
+            double getTPR() {
+                return 1993.6;
+            }
+        },
+        GOBILDA_60 {
+            @Override
+            double getTPR() {
+                return 2786.2;
+            }
+        },
+        GOBILDA_43 {
+            @Override
+            double getTPR() {
+                return 3895.9;
+            }
+        },
+        GOBILDA_30 {
+            @Override
+            double getTPR() {
+                return 5281.1;
+            }
+        };
+
+        abstract double getTPR();
+    }
+    public enum AngleUnit {
+        TICKS,
+        DEGREES,
+        RADIANS,
+        ROTATIONS
     }
 
     private OpMode opmode;
@@ -37,42 +100,7 @@ public class Motor {
     }
     Motor(String deviceName, RPM motorRPM){
         this.deviceName = deviceName;
-        switch (motorRPM){
-            case GOBILDA_6000:
-                this.ticksPerRotation = 28;
-                break;
-            case GOBILDA_1620:
-                this.ticksPerRotation = 103.8;
-                break;
-            case GOBILDA_1150:
-                this.ticksPerRotation = 145.1;
-                break;
-            case GOBILDA_435:
-                this.ticksPerRotation = 384.5;
-                break;
-            case GOBILDA_312:
-                this.ticksPerRotation = 537.7;
-                break;
-            case GOBILDA_223:
-                this.ticksPerRotation = 751.8;
-                break;
-            case GOBILDA_117:
-                this.ticksPerRotation = 1425.1;
-                break;
-            case GOBILDA_84:
-                this.ticksPerRotation = 1993.6;
-                break;
-            case GOBILDA_60:
-                this.ticksPerRotation = 2786.2;
-                break;
-            case GOBILDA_43:
-                this.ticksPerRotation = 3895.9;
-                break;
-            case GOBILDA_30:
-                this.ticksPerRotation = 5281.1;
-                break;
-
-        }
+        this.ticksPerRotation = motorRPM.getTPR();
     }
 
     /**
